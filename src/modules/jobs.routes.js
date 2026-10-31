@@ -4,6 +4,7 @@ import { env } from '../config/env.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { reconcilePendingPayments } from '../services/payments.service.js';
+import { generateDueInvoices } from '../services/billing-cycle.service.js';
 
 const router = Router();
 
@@ -18,6 +19,7 @@ function requireCronSecret(req, res, next) {
   next();
 }
 
+router.get('/generate-invoices', requireCronSecret, asyncHandler(async (req, res) => res.json(await generateDueInvoices())));
 router.get('/reconcile-payments', requireCronSecret, asyncHandler(async (req, res) => res.json(await reconcilePendingPayments())));
 
 export default router;

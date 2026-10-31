@@ -51,6 +51,9 @@ async function allocatePayment(payment, session) {
     invoices = await Invoice.find({ _id: payment.invoiceId, payerId: payment.payerId, status: OPEN_INVOICE }).session(session).lean();
   } else if (payment.encounterId) {
     invoices = await Invoice.find({ encounterId: payment.encounterId, payerId: payment.payerId, status: OPEN_INVOICE }).sort({ issuedAt: 1 }).session(session).lean();
+  } else if (payment.autoAllocate) {
+    // e.g. a company's lump-sum transfer: clear its oldest open invoices first; any excess stays as credit
+    invoices = await Invoice.find({ payerId: payment.payerId, status: OPEN_INVOICE }).sort({ issuedAt: 1 }).limit(500).session(session).lean();
   }
   const allocations = [];
   for (const inv of invoices) {
@@ -84,7 +87,7 @@ async function completePayment(payment, extra, ctx, session) {
 
 // ---------------------------------------------------------------- manual (cash / POS / transfer)
 export async function recordManualPayment(input, ctx) {
-  const { payerId, amountKobo, method, invoiceId, encounterId, externalRef, idempotencyKey } = input;
+  const { payerId, amountKobo, method, invoiceId, encounterId, externalRef, idempotencyKey, autoAllocate = false } = input;
   if (idempotencyKey) {
     const existing = await Payment.findOne({ idempotencyKey }).lean();
     if (existing) {
@@ -98,7 +101,7 @@ export async function recordManualPayment(input, ctx) {
 
   const payment = await withTransaction(async (session) => {
     const [created] = await Payment.create([{
-      payerId, patientId, invoiceId, encounterId, method, amountKobo, externalRef, idempotencyKey,
+      payerId, patientId, invoiceId, encounterId, method, amountKobo, externalRef, idempotencyKey, autoAllocate,
       status: 'pending', unallocatedKobo: 0, receivedBy: ctx.actorId,
     }], { session });
     const done = await completePayment(created, {}, ctx, session);
@@ -112,7 +115,7 @@ export async function recordManualPayment(input, ctx) {
 }
 
 // ---------------------------------------------------------------- Paystack
-export async function initiatePaystackPayment({ payerId, amountKobo, invoiceId, encounterId, email }, ctx) {
+export async function initiatePaystackPayment({ payerId, amountKobo, invoiceId, encounterId, email, autoAllocate = false }, ctx) {
   if (!env.PAYSTACK_SECRET_KEY) throw new AppError(503, 'PAYSTACK_NOT_CONFIGURED', 'Paystack is not configured on this server');
   const { payer, patientId } = await resolveTarget({ payerId, amountKobo, invoiceId, encounterId });
 
@@ -124,7 +127,7 @@ export async function initiatePaystackPayment({ payerId, amountKobo, invoiceId, 
   // Our own reference, stored BEFORE the customer is redirected, so any later webhook can be matched.
   const reference = `HB-${crypto.randomBytes(10).toString('hex')}`;
   const [payment] = await Payment.create([{
-    payerId, patientId, invoiceId, encounterId, method: 'paystack', amountKobo,
+    payerId, patientId, invoiceId, encounterId, method: 'paystack', amountKobo, autoAllocate,
     status: 'pending', receivedBy: ctx.actorId, paystack: { reference },
   }]);
   await recordAudit(ctx, { action: 'payment.paystack.initiate', entity: 'Payment', entityId: payment._id, after: { amountKobo, payerId, reference } });
@@ -270,4 +273,45 @@ export async function getPayment(id) {
   const payment = await Payment.findById(id).select('-paystack.accessCode').lean();
   if (!payment) throw new AppError(404, 'PAYMENT_NOT_FOUND', 'Payment not found');
   return payment;
+}
+
+/**
+ * Apply credit that is sitting unallocated on a successful payment (a deposit, a lump sum, an overpayment)
+ * to open invoices. The money is already in the ledger, so only the invoice and payment records change.
+ */
+export async function allocateExistingCredit(paymentId, { invoiceId } = {}, ctx) {
+  return withTransaction(async (session) => {
+    const payment = await Payment.findById(paymentId).session(session);
+    if (!payment) throw new AppError(404, 'PAYMENT_NOT_FOUND', 'Payment not found');
+    if (payment.status !== 'success' || payment.unallocatedKobo <= 0) {
+      throw new AppError(422, 'NOTHING_TO_ALLOCATE', 'This payment has no unallocated credit');
+    }
+    const filter = { payerId: payment.payerId, status: OPEN_INVOICE, ...(invoiceId ? { _id: invoiceId } : {}) };
+    const invoices = await Invoice.find(filter).sort({ issuedAt: 1 }).limit(500).session(session).lean();
+    if (invoiceId && !invoices.length) throw new AppError(422, 'INVOICE_NOT_PAYABLE', 'That invoice is not open, or belongs to a different payer');
+
+    let remaining = payment.unallocatedKobo;
+    const applied = [];
+    for (const inv of invoices) {
+      if (remaining <= 0) break;
+      const apply = Math.min(inv.totalKobo - inv.paidKobo, remaining);
+      if (apply <= 0) continue;
+      await bumpInvoicePaid(inv._id, apply, session);
+      applied.push({ invoiceId: inv._id, amountKobo: apply });
+      remaining -= apply;
+    }
+    if (!applied.length) throw new AppError(422, 'NO_OPEN_INVOICES', 'There are no open invoices to apply this credit to');
+
+    const r = await Payment.updateOne(
+      { _id: payment._id, unallocatedKobo: payment.unallocatedKobo },
+      { $set: { unallocatedKobo: remaining }, $push: { allocations: { $each: applied } } },
+      { session }
+    );
+    if (r.modifiedCount !== 1) throw new AppError(409, 'PAYMENT_CHANGED', 'Payment changed while allocating. Please retry.');
+    await recordAudit(ctx, {
+      action: 'payment.allocate', entity: 'Payment', entityId: payment._id,
+      meta: { appliedKobo: payment.unallocatedKobo - remaining, invoices: applied.length },
+    }, session);
+    return { paymentId: payment._id, applied, unallocatedKobo: remaining };
+  });
 }

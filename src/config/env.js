@@ -31,6 +31,9 @@ const schema = z.object({
   PAYSTACK_CALLBACK_URL: optional(z.string().url()),
   PAYSTACK_FALLBACK_EMAIL: optional(z.string().email()), // used when a payer has no email on file
 
+  // Family cards: default maximum number of people (holder included) on one card
+  FAMILY_CARD_MAX_MEMBERS: z.coerce.number().int().min(2).max(50).default(10),
+
   // Protects the scheduled reconciliation endpoint (Vercel Cron sends it as a Bearer token)
   CRON_SECRET: optional(z.string().min(16)),
 });

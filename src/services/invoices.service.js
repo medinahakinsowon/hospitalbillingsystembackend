@@ -28,7 +28,7 @@ export async function bumpInvoicePaid(invoiceId, amountKobo, session) {
 }
 
 /** Apply a payer's unallocated credit (deposits, top-ups) to a newly issued invoice. No ledger change: the money is already counted. */
-async function applyCreditToInvoice(invoiceId, session) {
+export async function applyCreditToInvoice(invoiceId, session) {
   const invoice = await Invoice.findById(invoiceId).session(session).lean();
   let outstanding = invoice.totalKobo - invoice.paidKobo;
   if (outstanding <= 0) return;
@@ -82,6 +82,7 @@ export async function invoiceEncounter(encounterId, { payerId, payerTypes } = {}
           qty: c.qty, unitPriceKobo: c.unitPriceKobo, totalKobo: c.totalKobo,
         })),
         totalKobo: charges.reduce((sum, c) => sum + c.totalKobo, 0),
+        status: charges.reduce((sum, c) => sum + c.totalKobo, 0) === 0 ? 'paid' : 'issued', // free services need no payment
         issuedAt: now,
         dueAt: new Date(now.getTime() + (payer.paymentTermsDays ?? 0) * 86400000),
         createdBy: ctx.actorId,

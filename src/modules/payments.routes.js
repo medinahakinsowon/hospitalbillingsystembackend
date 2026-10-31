@@ -26,6 +26,7 @@ router.post('/', requirePermission('payments:create'),
   validate({ body: z.object({
     ...target, method: z.enum(['cash', 'pos', 'transfer']),
     externalRef: z.string().trim().max(80).optional(), idempotencyKey: z.string().optional(),
+    autoAllocate: z.boolean().default(false), // lump sum: clear the payer's oldest open invoices first
   }).refine(oneTarget, oneTargetMsg) }),
   asyncHandler(async (req, res) => {
     const { payment, duplicate } = await payments.recordManualPayment({ ...req.body, idempotencyKey: idempotencyKeyOf(req) }, reqContext(req));
@@ -34,7 +35,7 @@ router.post('/', requirePermission('payments:create'),
 
 // Start an online payment; send the customer to authorizationUrl
 router.post('/paystack/initiate', requirePermission('payments:create'),
-  validate({ body: z.object({ ...target, email: z.string().email().optional() }).refine(oneTarget, oneTargetMsg) }),
+  validate({ body: z.object({ ...target, email: z.string().email().optional(), autoAllocate: z.boolean().default(false) }).refine(oneTarget, oneTargetMsg) }),
   asyncHandler(async (req, res) => res.status(201).json(await payments.initiatePaystackPayment(req.body, reqContext(req)))));
 
 router.get('/', requirePermission('payments:read'),
@@ -51,6 +52,11 @@ router.get('/:id', requirePermission('payments:read'), validate({ params: idPara
 // Ask Paystack about this payment now (use when the customer returns from checkout)
 router.post('/:id/verify', requirePermission('payments:verify'), validate({ params: idParam }),
   asyncHandler(async (req, res) => res.json(await payments.verifyPaymentById(req.params.id))));
+
+// Apply credit already sitting on a successful payment (deposit, lump sum, overpayment) to open invoices
+router.post('/:id/allocate', requirePermission('payments:create'),
+  validate({ params: idParam, body: z.object({ invoiceId: objectId.optional() }) }),
+  asyncHandler(async (req, res) => res.json(await payments.allocateExistingCredit(req.params.id, req.body, reqContext(req)))));
 
 router.get('/:id/receipt', requirePermission('payments:read'), validate({ params: idParam }),
   asyncHandler(async (req, res) => streamReceiptPdf(req.params.id, res)));

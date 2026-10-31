@@ -28,6 +28,10 @@ const payerSchema = new Schema(
     enforceLimit: { type: Boolean, default: true },
 
     mode: { type: String, enum: ['credit', 'prepaid'] }, // family cards only; default credit
+    maxMembers: { type: Number, min: 1, max: 50 }, // family cards: people allowed on the card, holder included
+    lowBalanceThresholdKobo: kobo({ min: 0 }), // prepaid cards: flag the card when the deposit falls to this level
+    // Periodic invoicing marker: everything charged before this instant has been invoiced (or deliberately skipped).
+    lastInvoicedThrough: { type: Date, default: null },
     paymentTermsDays: { type: Number, min: 0, max: 365 },
     billingCycle: { type: String, enum: ['weekly', 'monthly', 'quarterly'] },
     holderPatientId: { type: Schema.Types.ObjectId, ref: 'Patient' }, // family: card holder; individual: the patient

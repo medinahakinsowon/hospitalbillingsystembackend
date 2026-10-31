@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authenticate, requirePermission } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { dateOnly, idParam, pagination } from '../utils/schemas.js';
+import { dateOnly, idParam, objectId, pagination } from '../utils/schemas.js';
 import { reqContext } from '../services/audit.service.js';
 import * as patients from '../services/patients.service.js';
 import { getEligibility, listPatientCoverages } from '../services/coverage.service.js';
@@ -73,8 +73,8 @@ router.get(
 router.get(
   '/:id/eligibility',
   requirePermission('coverages:read'),
-  validate({ params: idParam }),
-  asyncHandler(async (req, res) => res.json(await getEligibility(req.params.id)))
+  validate({ params: idParam, query: z.object({ serviceId: objectId.optional(), qty: z.coerce.number().int().min(1).max(1000).default(1) }) }),
+  asyncHandler(async (req, res) => res.json(await getEligibility(req.params.id, req.query)))
 );
 
 export default router;

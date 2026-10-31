@@ -9,6 +9,12 @@ const lineSchema = new Schema(
     date: Date,
     description: String,
     department: String,
+    // Present on consolidated invoices and statements so each person's treatments can be listed separately
+    patientId: { type: Schema.Types.ObjectId, ref: 'Patient' },
+    patientName: String,
+    hospitalNumber: String,
+    employeeRef: String,
+    encounterNo: String,
     qty: Number,
     unitPriceKobo: kobo,
     totalKobo: kobo,
@@ -36,6 +42,8 @@ const invoiceSchema = new Schema(
     totalKobo: kobo,
     paidKobo: { ...kobo, default: 0 },
 
+    periodStart: Date, // consolidated invoices and statements
+    periodEnd: Date,
     issuedAt: { type: Date, default: Date.now },
     dueAt: Date,
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
@@ -46,5 +54,6 @@ invoiceSchema.index({ invoiceNo: 1 }, { unique: true });
 invoiceSchema.index({ payerId: 1, status: 1, dueAt: 1 });
 invoiceSchema.index({ encounterId: 1, payerId: 1 });
 invoiceSchema.index({ patientId: 1, issuedAt: -1 });
+invoiceSchema.index({ payerId: 1, type: 1, periodEnd: -1 });
 
 export const Invoice = mongoose.model('Invoice', invoiceSchema);

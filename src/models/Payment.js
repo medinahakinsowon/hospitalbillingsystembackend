@@ -21,6 +21,8 @@ const paymentSchema = new Schema(
     // 'flagged' = the gateway reported success but something did not match (e.g. amount); needs a human.
     status: { type: String, enum: ['pending', 'success', 'failed', 'abandoned', 'flagged'], default: 'pending' },
     externalRef: { type: String, maxlength: 80 }, // POS slip no. or bank transfer reference
+    // With no invoice/encounter target: apply this payment to the payer's open invoices, oldest first (e.g. a company's lump-sum transfer).
+    autoAllocate: { type: Boolean, default: false },
     paystack: {
       reference: String,
       accessCode: String,

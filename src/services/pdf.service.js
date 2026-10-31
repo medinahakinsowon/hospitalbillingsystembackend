@@ -27,7 +27,7 @@ function header(doc, title) {
   doc.font('Helvetica').fontSize(9).fillColor(GREY);
   if (env.HOSPITAL_ADDRESS) doc.text(env.HOSPITAL_ADDRESS, { width: 300 });
   if (env.HOSPITAL_PHONE) doc.text(env.HOSPITAL_PHONE, { width: 300 });
-  doc.font('Helvetica-Bold').fontSize(22).fillColor('#000').text(title, 350, 50, { width: 195, align: 'right' });
+  doc.font('Helvetica-Bold').fontSize(title.length > 10 ? 15 : 22).fillColor('#000').text(title, 330, title.length > 10 ? 56 : 50, { width: 215, align: 'right' });
   doc.y = Math.max(doc.y, 100) + 10;
   doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor(LINE).stroke();
   doc.y += 12;
@@ -38,13 +38,108 @@ function kv(doc, x, y, label, value, width = 230) {
   doc.font('Helvetica-Bold').fontSize(10).fillColor('#000').text(value || '-', x, doc.y, { width });
 }
 
+function totalsBlock(doc, y, inv) {
+  if (y > 690) { doc.addPage(); y = 60; }
+  y += 10;
+  const row = (label, value, bold) => {
+    doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 11 : 10).fillColor('#000');
+    doc.text(label, 340, y, { width: 100, align: 'right' });
+    doc.text(value, 445, y, { width: 100, align: 'right' });
+    y += bold ? 20 : 16;
+  };
+  row('Total', formatMoney(inv.totalKobo));
+  row('Paid', formatMoney(inv.paidKobo));
+  row('Balance due', formatMoney(inv.totalKobo - inv.paidKobo), true);
+  doc.font('Helvetica').fontSize(8).fillColor(GREY).text('Thank you. Please quote the invoice number with any payment.', 50, Math.max(y + 30, 760), { width: 495, align: 'center' });
+}
+
+/** Single-visit invoice: one flat table. */
+function visitTable(doc, inv) {
+  const cols = { date: 50, desc: 115, qty: 360, unit: 400, amt: 475 };
+  const head = (y) => {
+    doc.rect(50, y - 4, 495, 18).fill('#f0f0f0');
+    doc.fillColor('#000').font('Helvetica-Bold').fontSize(9);
+    doc.text('Date', cols.date + 4, y, { width: 60 });
+    doc.text('Description', cols.desc, y, { width: 240 });
+    doc.text('Qty', cols.qty, y, { width: 35, align: 'right' });
+    doc.text('Unit price', cols.unit, y, { width: 70, align: 'right' });
+    doc.text('Amount', cols.amt, y, { width: 66, align: 'right' });
+  };
+  let y = doc.y + 4;
+  head(y); y += 22;
+  doc.font('Helvetica').fontSize(9);
+  for (const l of inv.lines) {
+    if (y > 730) { doc.addPage(); y = 60; head(y); y += 22; doc.font('Helvetica').fontSize(9); }
+    const h = Math.max(14, doc.heightOfString(l.description || '', { width: 240 }) + 4);
+    doc.fillColor('#000');
+    doc.text(fmtDate(l.date), cols.date + 4, y, { width: 60 });
+    doc.text(l.description || '', cols.desc, y, { width: 240 });
+    doc.text(String(l.qty), cols.qty, y, { width: 35, align: 'right' });
+    doc.text(formatMoney(l.unitPriceKobo), cols.unit - 10, y, { width: 80, align: 'right' });
+    doc.text(formatMoney(l.totalKobo), cols.amt - 10, y, { width: 76, align: 'right' });
+    y += h;
+    doc.moveTo(50, y - 2).lineTo(545, y - 2).strokeColor('#eeeeee').stroke();
+  }
+  return y;
+}
+
+/** Consolidated invoice / statement: treatments grouped per person with subtotals. */
+function groupedTable(doc, inv) {
+  const c = { date: 50, visit: 112, desc: 176, qty: 352, unit: 385, amt: 470 };
+  const head = (y) => {
+    doc.rect(50, y - 4, 495, 18).fill('#f0f0f0');
+    doc.fillColor('#000').font('Helvetica-Bold').fontSize(8);
+    doc.text('Date', c.date + 4, y, { width: 60 }); doc.text('Visit', c.visit, y, { width: 60 });
+    doc.text('Description', c.desc, y, { width: 170 }); doc.text('Qty', c.qty, y, { width: 28, align: 'right' });
+    doc.text('Unit price', c.unit, y, { width: 75, align: 'right' }); doc.text('Amount', c.amt, y, { width: 71, align: 'right' });
+  };
+  const groups = [];
+  for (const l of inv.lines) {
+    const key = String(l.patientId ?? l.patientName);
+    let g = groups.find((x) => x.key === key);
+    if (!g) { g = { key, name: l.patientName, hn: l.hospitalNumber, ref: l.employeeRef, lines: [] }; groups.push(g); }
+    g.lines.push(l);
+  }
+  let y = doc.y + 4;
+  head(y); y += 22;
+  for (const g of groups) {
+    if (y > 700) { doc.addPage(); y = 60; head(y); y += 22; }
+    doc.rect(50, y - 3, 495, 16).fill('#e8eef5');
+    doc.fillColor('#000').font('Helvetica-Bold').fontSize(9)
+      .text(`${g.name}  (${g.hn || '-'})${g.ref ? `   Staff/ref: ${g.ref}` : ''}`, 54, y, { width: 480 });
+    y += 18;
+    doc.font('Helvetica').fontSize(8);
+    for (const l of g.lines) {
+      const h = Math.max(13, doc.heightOfString(l.description || '', { width: 170 }) + 3);
+      if (y + h > 740) { doc.addPage(); y = 60; head(y); y += 22; doc.font('Helvetica').fontSize(8); }
+      doc.fillColor('#000');
+      doc.text(fmtDate(l.date), c.date + 4, y, { width: 60 });
+      doc.text(l.encounterNo || '', c.visit, y, { width: 62 });
+      doc.text(l.description || '', c.desc, y, { width: 170 });
+      doc.text(String(l.qty), c.qty, y, { width: 28, align: 'right' });
+      doc.text(formatMoney(l.unitPriceKobo), c.unit - 5, y, { width: 80, align: 'right' });
+      doc.text(formatMoney(l.totalKobo), c.amt - 5, y, { width: 76, align: 'right' });
+      y += h;
+    }
+    const sub = g.lines.reduce((sum, l) => sum + l.totalKobo, 0);
+    doc.font('Helvetica-Bold').fontSize(8).text(`Subtotal ${g.name}`, c.desc, y, { width: 200 });
+    doc.text(formatMoney(sub), c.amt - 5, y, { width: 76, align: 'right' });
+    y += 8;
+    doc.moveTo(50, y + 6).lineTo(545, y + 6).strokeColor('#dddddd').stroke();
+    y += 14;
+  }
+  return { y, people: groups.length };
+}
+
 export async function streamInvoicePdf(invoiceId, res) {
   const inv = await Invoice.findById(invoiceId).lean();
   if (!inv) throw new AppError(404, 'INVOICE_NOT_FOUND', 'Invoice not found');
   const payer = await Payer.findById(inv.payerId).select('billingContact').lean();
+  const visit = inv.type === 'visit';
+  const title = inv.type === 'statement' ? 'STATEMENT' : 'INVOICE';
 
   pipePdf(res, inv.invoiceNo, (doc) => {
-    header(doc, 'INVOICE');
+    header(doc, title);
     const top = doc.y;
     kv(doc, 50, top, 'Billed to', inv.payerName);
     doc.font('Helvetica').fontSize(9).fillColor(GREY).text(`${inv.payerCode}${payer?.billingContact?.name ? ` | Attn: ${payer.billingContact.name}` : ''}`, 50, doc.y, { width: 230 });
@@ -54,52 +149,74 @@ export async function streamInvoicePdf(invoiceId, res) {
     kv(doc, 320, doc.y + 4, 'Status', inv.status.toUpperCase(), 225);
     doc.y = Math.max(leftEnd, doc.y) + 14;
 
-    if (inv.patientName) {
+    if (visit && inv.patientName) {
       kv(doc, 50, doc.y, 'Patient', `${inv.patientName}  (${inv.hospitalNumber})`, 300);
       doc.font('Helvetica').fontSize(9).fillColor(GREY).text(`Visit ${inv.encounterNo || ''}`, 50, doc.y, { width: 300 });
       doc.y += 12;
     }
-
-    // table
-    const cols = { date: 50, desc: 115, qty: 360, unit: 400, amt: 475 };
-    const rowHead = (y) => {
-      doc.rect(50, y - 4, 495, 18).fill('#f0f0f0');
-      doc.fillColor('#000').font('Helvetica-Bold').fontSize(9);
-      doc.text('Date', cols.date + 4, y, { width: 60 });
-      doc.text('Description', cols.desc, y, { width: 240 });
-      doc.text('Qty', cols.qty, y, { width: 35, align: 'right' });
-      doc.text('Unit price', cols.unit, y, { width: 70, align: 'right' });
-      doc.text('Amount', cols.amt, y, { width: 66, align: 'right' });
-    };
-    let y = doc.y + 4;
-    rowHead(y);
-    y += 22;
-    doc.font('Helvetica').fontSize(9);
-    for (const l of inv.lines) {
-      if (y > 730) { doc.addPage(); y = 60; rowHead(y); y += 22; doc.font('Helvetica').fontSize(9); }
-      const h = Math.max(14, doc.heightOfString(l.description || '', { width: 240 }) + 4);
-      doc.fillColor('#000');
-      doc.text(fmtDate(l.date), cols.date + 4, y, { width: 60 });
-      doc.text(l.description || '', cols.desc, y, { width: 240 });
-      doc.text(String(l.qty), cols.qty, y, { width: 35, align: 'right' });
-      doc.text(formatMoney(l.unitPriceKobo), cols.unit - 10, y, { width: 80, align: 'right' });
-      doc.text(formatMoney(l.totalKobo), cols.amt - 10, y, { width: 76, align: 'right' });
-      y += h;
-      doc.moveTo(50, y - 2).lineTo(545, y - 2).strokeColor('#eeeeee').stroke();
+    if (!visit && inv.periodEnd) {
+      const to = fmtDate(new Date(inv.periodEnd.getTime() - 1));
+      kv(doc, 50, doc.y, 'Period', inv.periodStart ? `${fmtDate(inv.periodStart)} to ${to}` : `Up to ${to}`, 300);
+      doc.y += 6;
     }
 
-    if (y > 690) { doc.addPage(); y = 60; }
-    y += 10;
-    const totalRow = (label, value, bold) => {
-      doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 11 : 10).fillColor('#000');
-      doc.text(label, 340, y, { width: 100, align: 'right' });
-      doc.text(value, 445, y, { width: 100, align: 'right' });
-      y += bold ? 20 : 16;
+    let y;
+    if (visit) {
+      y = visitTable(doc, inv);
+    } else {
+      const g = groupedTable(doc, inv);
+      y = g.y;
+      doc.font('Helvetica').fontSize(8).fillColor(GREY).text(`${g.people} ${g.people === 1 ? 'person' : 'people'}, ${inv.lines.length} treatments`, 50, y);
+      y += 12;
+    }
+    totalsBlock(doc, y, inv);
+  });
+}
+
+/** Ledger statement for any payer (useful for prepaid cards, which have no invoices). */
+export async function streamAccountStatementPdf(statement, res) {
+  const { payer, from, to, openingKobo, closingKobo, entries, totals, truncated } = statement;
+  const shown = entries.slice(0, 2000);
+  pipePdf(res, `statement-${payer.code}`, (doc) => {
+    header(doc, 'ACCOUNT STATEMENT');
+    const top = doc.y;
+    kv(doc, 50, top, 'Account', payer.name);
+    doc.font('Helvetica').fontSize(9).fillColor(GREY).text(`${payer.code}${payer.mode ? ` | ${payer.mode} card` : ''}`, 50, doc.y, { width: 230 });
+    const leftEnd = doc.y;
+    kv(doc, 320, top, 'Period', `${fmtDate(from)} to ${fmtDate(new Date(to.getTime() - 1))}`, 225);
+    kv(doc, 320, doc.y + 4, 'Opening / Closing', `${formatMoney(openingKobo)}  /  ${formatMoney(closingKobo)}`, 225);
+    doc.y = Math.max(leftEnd, doc.y) + 12;
+    doc.font('Helvetica').fontSize(8).fillColor(GREY).text('Positive balance = amount owed to the hospital. Negative balance = credit held for you.', 50, doc.y);
+    doc.y += 14;
+
+    const c = { date: 50, desc: 120, chg: 335, pay: 410, bal: 480 };
+    const head = (y) => {
+      doc.rect(50, y - 4, 495, 18).fill('#f0f0f0');
+      doc.fillColor('#000').font('Helvetica-Bold').fontSize(8);
+      doc.text('Date', c.date + 4, y, { width: 65 }); doc.text('Description', c.desc, y, { width: 210 });
+      doc.text('Charges', c.chg, y, { width: 70, align: 'right' }); doc.text('Payments', c.pay, y, { width: 65, align: 'right' });
+      doc.text('Balance', c.bal, y, { width: 61, align: 'right' });
     };
-    totalRow('Total', formatMoney(inv.totalKobo));
-    totalRow('Paid', formatMoney(inv.paidKobo));
-    totalRow('Balance due', formatMoney(inv.totalKobo - inv.paidKobo), true);
-    doc.font('Helvetica').fontSize(8).fillColor(GREY).text('Thank you. Please quote the invoice number with any payment.', 50, Math.max(y + 30, 760), { width: 495, align: 'center' });
+    let y = doc.y; head(y); y += 22;
+    doc.font('Helvetica').fontSize(8);
+    for (const e of shown) {
+      const h = Math.max(13, doc.heightOfString(e.description || e.type, { width: 210 }) + 3);
+      if (y + h > 740) { doc.addPage(); y = 60; head(y); y += 22; doc.font('Helvetica').fontSize(8); }
+      doc.fillColor('#000');
+      doc.text(fmtDate(e.at), c.date + 4, y, { width: 65 });
+      doc.text(e.description || e.type, c.desc, y, { width: 210 });
+      if (e.amountKobo > 0) doc.text(formatMoney(e.amountKobo), c.chg - 8, y, { width: 78, align: 'right' });
+      else doc.text(formatMoney(-e.amountKobo), c.pay - 8, y, { width: 73, align: 'right' });
+      doc.text(formatMoney(e.balanceAfterKobo), c.bal - 8, y, { width: 69, align: 'right' });
+      y += h;
+    }
+    if (y > 700) { doc.addPage(); y = 60; }
+    y += 10;
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#000');
+    doc.text(`Total charges ${formatMoney(totals.chargesKobo)}     Total payments ${formatMoney(totals.paymentsKobo)}     Closing balance ${formatMoney(closingKobo)}`, 50, y, { width: 495, align: 'right' });
+    if (truncated || entries.length > shown.length) {
+      doc.font('Helvetica').fontSize(8).fillColor(GREY).text('Only the first entries are shown. Choose a shorter period for the full list.', 50, y + 18, { width: 495 });
+    }
   });
 }
 

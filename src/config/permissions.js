@@ -10,7 +10,7 @@ const ALL = [
   'tariffs:read', 'tariffs:manage',
   'encounters:create', 'encounters:read', 'encounters:update', 'encounters:override',
   'charges:create', 'charges:read', 'charges:void', 'charges:override',
-  'invoices:read', 'invoices:create',
+  'invoices:read', 'invoices:create', 'invoices:generate',
   'payments:create', 'payments:read', 'payments:verify',
 ];
 
@@ -34,7 +34,7 @@ export const ROLE_PERMISSIONS = {
     'patients:read', 'payers:create', 'payers:read', 'payers:update',
     'coverages:read', 'coverages:manage', 'ledger:read',
     'services:read', 'tariffs:read', 'encounters:read', 'encounters:update', 'charges:read', 'charges:void',
-    'invoices:read', 'invoices:create', 'payments:create', 'payments:read', 'payments:verify',
+    'invoices:read', 'invoices:create', 'invoices:generate', 'payments:create', 'payments:read', 'payments:verify',
   ],
   finance_manager: [
     'patients:read', 'payers:read', 'payers:update', 'coverages:read',
