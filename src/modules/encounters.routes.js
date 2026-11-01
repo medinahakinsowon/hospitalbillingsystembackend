@@ -45,9 +45,10 @@ router.post('/:id/charges', requirePermission('charges:create'),
     idempotencyKey: z.string().optional(),
   }) }),
   asyncHandler(async (req, res) => {
-    const { charge, duplicate } = await charges.captureCharge(
+    const { charge, charges: all, duplicate } = await charges.captureCharge(
       { ...req.body, encounterId: req.params.id, idempotencyKey: idempotencyKeyOf(req) }, reqContext(req));
-    res.status(duplicate ? 200 : 201).json({ ...charge, duplicate });
+    // Top level is the main charge; "charges" lists every share when a co-payment split it in two.
+    res.status(duplicate ? 200 : 201).json({ ...charge, charges: all, duplicate });
   }));
 
 router.get('/:id/charges', requirePermission('charges:read'), validate({ params: idParam }),

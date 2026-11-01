@@ -15,6 +15,7 @@ const lineSchema = new Schema(
     hospitalNumber: String,
     employeeRef: String,
     encounterNo: String,
+    credited: { type: Boolean, default: false }, // this line was credited by a credit note
     qty: Number,
     unitPriceKobo: kobo,
     totalKobo: kobo,
@@ -40,7 +41,9 @@ const invoiceSchema = new Schema(
 
     lines: [lineSchema],
     totalKobo: kobo,
+    // paidKobo counts everything that settles the invoice: payments AND credits. creditedKobo is the credit part.
     paidKobo: { ...kobo, default: 0 },
+    creditedKobo: { ...kobo, default: 0 },
 
     periodStart: Date, // consolidated invoices and statements
     periodEnd: Date,

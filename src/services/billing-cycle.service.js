@@ -21,6 +21,11 @@ const watParts = (d) => {
 };
 const watMidnight = (y, m, d) => new Date(Date.UTC(y, m, d) - HOUR); // Date.UTC rolls over months/days that overflow
 
+/** 00:00 on 1 January (Lagos time) of the year containing `now`. Member limits reset on this date. */
+export function startOfYearWat(now = new Date()) {
+  return watMidnight(watParts(now).y, 0, 1);
+}
+
 /** The most recent COMPLETED billing period for a cycle, as of `now`. [start, end) in real instants. */
 export function lastCompletedPeriod(cycle, now = new Date()) {
   const { y, m, day, dow } = watParts(now);

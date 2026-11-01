@@ -10,6 +10,7 @@ const serviceSchema = new Schema(
     department: { type: String, enum: DEPARTMENTS, required: true },
     category: { type: String, lowercase: true, trim: true, maxlength: 60 },
     active: { type: Boolean, default: true },
+    requiresAuthorization: { type: Boolean, default: false }, // e.g. MRI: payers must pre-approve it
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }

@@ -16,6 +16,7 @@ const fields = {
   name: z.string().trim().min(2).max(160),
   department: z.enum(DEPARTMENTS),
   category: z.string().trim().max(60).optional(),
+  requiresAuthorization: z.boolean().optional(),
 };
 
 router.post('/', requirePermission('services:manage'), validate({ body: z.object(fields) }),
@@ -30,7 +31,7 @@ router.get('/', requirePermission('services:read'),
   asyncHandler(async (req, res) => res.json(await catalog.listServices(req.query))));
 
 router.patch('/:id', requirePermission('services:manage'),
-  validate({ params: idParam, body: z.object({ name: fields.name, department: fields.department, category: fields.category, active: z.boolean() })
+  validate({ params: idParam, body: z.object({ name: fields.name, department: fields.department, category: fields.category, requiresAuthorization: fields.requiresAuthorization, active: z.boolean() })
     .partial().refine((b) => Object.keys(b).length > 0, 'Nothing to update') }),
   asyncHandler(async (req, res) => res.json(await catalog.updateService(req.params.id, req.body, reqContext(req)))));
 

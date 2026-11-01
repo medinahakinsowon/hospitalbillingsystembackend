@@ -14,7 +14,8 @@
     "test:ledger": "node scripts/ledger-smoke-test.js",
     "seed:catalog": "node scripts/seed-catalog.js",
     "test:billing": "node scripts/billing-smoke-test.js",
-    "test:cards": "node scripts/cards-smoke-test.js"
+    "test:cards": "node scripts/cards-smoke-test.js",
+    "test:controls": "node scripts/controls-smoke-test.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

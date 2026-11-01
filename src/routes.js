@@ -13,6 +13,9 @@ import charges from './modules/charges.routes.js';
 import invoices from './modules/invoices.routes.js';
 import payments from './modules/payments.routes.js';
 import jobs from './modules/jobs.routes.js';
+import authorizations from './modules/authorizations.routes.js';
+import adjustments from './modules/adjustments.routes.js';
+import refunds from './modules/refunds.routes.js';
 
 const router = Router();
 router.use('/auth', auth);
@@ -29,4 +32,7 @@ router.use('/charges', charges);
 router.use('/invoices', invoices);
 router.use('/payments', payments);
 router.use('/jobs', jobs);
+router.use('/authorizations', authorizations);
+router.use('/adjustments', adjustments);
+router.use('/refunds', refunds);
 export default router;

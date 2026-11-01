@@ -48,7 +48,8 @@ function totalsBlock(doc, y, inv) {
     y += bold ? 20 : 16;
   };
   row('Total', formatMoney(inv.totalKobo));
-  row('Paid', formatMoney(inv.paidKobo));
+  if (inv.creditedKobo > 0) row('Credits & discounts', `-${formatMoney(inv.creditedKobo)}`);
+  row('Paid', formatMoney(inv.paidKobo - (inv.creditedKobo || 0)));
   row('Balance due', formatMoney(inv.totalKobo - inv.paidKobo), true);
   doc.font('Helvetica').fontSize(8).fillColor(GREY).text('Thank you. Please quote the invoice number with any payment.', 50, Math.max(y + 30, 760), { width: 495, align: 'center' });
 }
@@ -70,10 +71,11 @@ function visitTable(doc, inv) {
   doc.font('Helvetica').fontSize(9);
   for (const l of inv.lines) {
     if (y > 730) { doc.addPage(); y = 60; head(y); y += 22; doc.font('Helvetica').fontSize(9); }
-    const h = Math.max(14, doc.heightOfString(l.description || '', { width: 240 }) + 4);
+    const desc = `${l.description || ''}${l.credited ? ' (credited)' : ''}`;
+    const h = Math.max(14, doc.heightOfString(desc, { width: 240 }) + 4);
     doc.fillColor('#000');
     doc.text(fmtDate(l.date), cols.date + 4, y, { width: 60 });
-    doc.text(l.description || '', cols.desc, y, { width: 240 });
+    doc.text(desc, cols.desc, y, { width: 240 });
     doc.text(String(l.qty), cols.qty, y, { width: 35, align: 'right' });
     doc.text(formatMoney(l.unitPriceKobo), cols.unit - 10, y, { width: 80, align: 'right' });
     doc.text(formatMoney(l.totalKobo), cols.amt - 10, y, { width: 76, align: 'right' });
@@ -110,12 +112,13 @@ function groupedTable(doc, inv) {
     y += 18;
     doc.font('Helvetica').fontSize(8);
     for (const l of g.lines) {
-      const h = Math.max(13, doc.heightOfString(l.description || '', { width: 170 }) + 3);
+      const desc = `${l.description || ''}${l.credited ? ' (credited)' : ''}`;
+      const h = Math.max(13, doc.heightOfString(desc, { width: 170 }) + 3);
       if (y + h > 740) { doc.addPage(); y = 60; head(y); y += 22; doc.font('Helvetica').fontSize(8); }
       doc.fillColor('#000');
       doc.text(fmtDate(l.date), c.date + 4, y, { width: 60 });
       doc.text(l.encounterNo || '', c.visit, y, { width: 62 });
-      doc.text(l.description || '', c.desc, y, { width: 170 });
+      doc.text(desc, c.desc, y, { width: 170 });
       doc.text(String(l.qty), c.qty, y, { width: 28, align: 'right' });
       doc.text(formatMoney(l.unitPriceKobo), c.unit - 5, y, { width: 80, align: 'right' });
       doc.text(formatMoney(l.totalKobo), c.amt - 5, y, { width: 76, align: 'right' });

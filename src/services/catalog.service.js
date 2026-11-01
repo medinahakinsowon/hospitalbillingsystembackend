@@ -32,7 +32,7 @@ export async function updateService(id, patch, ctx) {
   const svc = await Service.findById(id);
   if (!svc) throw new AppError(404, 'SERVICE_NOT_FOUND', 'Service not found');
   const before = svc.toObject();
-  const diff = changedFields(before, patch, ['name', 'department', 'category', 'active']);
+  const diff = changedFields(before, patch, ['name', 'department', 'category', 'active', 'requiresAuthorization']);
   if (!Object.keys(diff.after).length) return before;
   svc.set(diff.after);
   await svc.save();
@@ -41,9 +41,12 @@ export async function updateService(id, patch, ctx) {
 }
 
 /** Corporate contracts list covered/excluded services by code, category or department. */
+/** The names a payer's rules can use to refer to a service: its code, category or department (lowercase). */
+export const serviceKeys = (service) => [service.code, service.category, service.department].filter(Boolean).map((x) => String(x).toLowerCase());
+
 export function checkServiceCoverage(payer, service) {
   if (payer.type !== 'corporate' || !payer.contract) return { covered: true };
-  const keys = [service.code, service.category, service.department].filter(Boolean).map((x) => String(x).toLowerCase());
+  const keys = serviceKeys(service);
   const excluded = (payer.contract.excludedServices || []).map((x) => x.toLowerCase());
   const covered = (payer.contract.coveredServices || []).map((x) => x.toLowerCase());
   if (keys.some((k) => excluded.includes(k))) return { covered: false, reason: 'excluded' };

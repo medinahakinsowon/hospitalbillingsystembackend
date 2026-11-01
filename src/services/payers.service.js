@@ -78,12 +78,12 @@ export async function getPayer(id) {
   return toPayerView(payer);
 }
 
-const UPDATABLE = ['name', 'status', 'billingContact', 'creditLimitKobo', 'paymentTermsDays', 'billingCycle', 'guarantor', 'contract', 'tariffId', 'maxMembers', 'lowBalanceThresholdKobo'];
+const UPDATABLE = ['name', 'status', 'billingContact', 'creditLimitKobo', 'paymentTermsDays', 'billingCycle', 'guarantor', 'contract', 'tariffId', 'maxMembers', 'lowBalanceThresholdKobo', 'copay', 'authorizationThresholdKobo'];
 
 export async function updatePayer(id, patch, ctx) {
   const payer = await Payer.findById(id);
   if (!payer) throw new AppError(404, 'PAYER_NOT_FOUND', 'Payer not found');
-  if (payer.type === 'individual' && (patch.creditLimitKobo !== undefined || patch.contract || patch.guarantor)) {
+  if (payer.type === 'individual' && (patch.creditLimitKobo !== undefined || patch.contract || patch.guarantor || patch.copay || patch.authorizationThresholdKobo)) {
     throw new AppError(422, 'NOT_ALLOWED', 'Individual payers do not have credit limits, contracts or guarantors');
   }
   if (payer.type === 'family' && payer.mode === 'prepaid' && patch.creditLimitKobo) {

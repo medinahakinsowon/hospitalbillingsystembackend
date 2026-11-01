@@ -20,6 +20,14 @@ const chargeSchema = new Schema(
     tariffItemId: { type: Schema.Types.ObjectId, ref: 'TariffItem' },
     priceSource: { type: String, enum: ['payer_tariff', 'default_tariff'] },
 
+    // Co-payments: one service becomes two charges (payer share + patient co-pay) linked by splitGroupId.
+    // totalKobo is THIS payer's share; fullTotalKobo is the whole price.
+    fullTotalKobo: { type: Number, min: 0 },
+    sharePercent: { type: Number, min: 0, max: 100 },
+    splitGroupId: { type: Schema.Types.ObjectId },
+    splitRole: { type: String, enum: ['payer', 'copay'] },
+    authorizationId: { type: Schema.Types.ObjectId, ref: 'Authorization' },
+    authorizationBypassed: { type: Boolean, default: false }, // emergency: treated before approval was obtained
     ledgerEntryId: { type: Schema.Types.ObjectId, ref: 'LedgerEntry' },
     status: { type: String, enum: ['posted', 'reversed'], default: 'posted' },
     reversalReason: String,
@@ -39,6 +47,8 @@ chargeSchema.index({ encounterId: 1, status: 1 });
 chargeSchema.index({ payerId: 1, status: 1, invoiceId: 1 });
 chargeSchema.index({ patientId: 1, capturedAt: -1 });
 chargeSchema.index({ invoiceId: 1 });
+chargeSchema.index({ splitGroupId: 1 }, { partialFilterExpression: { splitGroupId: { $type: 'objectId' } } });
+chargeSchema.index({ payerId: 1, patientId: 1, status: 1, capturedAt: -1 });
 chargeSchema.index({ idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } });
 
 export const Charge = mongoose.model('Charge', chargeSchema);

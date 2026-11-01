@@ -27,6 +27,14 @@ const payerSchema = new Schema(
     // payment for them is enforced by the visit workflow (pay before service / before discharge).
     enforceLimit: { type: Boolean, default: true },
 
+    // Co-payment: the patient pays this percentage of each covered service, the payer pays the rest.
+    // appliesTo lists service codes, categories or departments; empty means every service.
+    copay: {
+      patientSharePercent: { type: Number, min: 0, max: 100, validate: { validator: Number.isInteger, message: 'must be a whole percentage' } },
+      appliesTo: [String],
+    },
+    // Any single charge whose payer share is above this needs an approved authorization. 0 = off.
+    authorizationThresholdKobo: kobo({ min: 0 }),
     mode: { type: String, enum: ['credit', 'prepaid'] }, // family cards only; default credit
     maxMembers: { type: Number, min: 1, max: 50 }, // family cards: people allowed on the card, holder included
     lowBalanceThresholdKobo: kobo({ min: 0 }), // prepaid cards: flag the card when the deposit falls to this level

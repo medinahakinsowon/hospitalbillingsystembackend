@@ -23,6 +23,8 @@ router.get('/expiring', requirePermission('payers:read'),
 const contact = z.object({ name: z.string().max(120).optional(), email: z.string().email().optional(), phone: z.string().max(20).optional() });
 const guarantor = z.object({ name: z.string().trim().min(2).max(120), phone: z.string().trim().min(7).max(20), idRef: z.string().max(60).optional() });
 const billingCycle = z.enum(['weekly', 'monthly', 'quarterly']);
+// Patient pays this % of each covered service; empty appliesTo = all services (otherwise service codes, categories or departments).
+const copay = z.object({ patientSharePercent: z.number().int().min(0).max(100), appliesTo: z.array(z.string().trim().min(1).max(60)).max(100).default([]) });
 const contract = z.object({
   startsAt: dateOnly,
   endsAt: dateOnly,
@@ -40,6 +42,8 @@ const createBody = z.discriminatedUnion('type', [
     billingCycle: billingCycle.default('monthly'),
     contract,
     tariffId: objectId.optional(),
+    copay: copay.optional(),
+    authorizationThresholdKobo: kobo.min(0).optional(),
   }),
   z.object({
     type: z.literal('family'),
@@ -53,6 +57,8 @@ const createBody = z.discriminatedUnion('type', [
     billingContact: contact.optional(),
     maxMembers: z.number().int().min(2).max(50).optional(),
     lowBalanceThresholdKobo: kobo.min(0).optional(),
+    copay: copay.optional(),
+    authorizationThresholdKobo: kobo.min(0).optional(),
   }),
 ]);
 
@@ -100,6 +106,8 @@ router.patch(
       tariffId: objectId,
       maxMembers: z.number().int().min(2).max(50),
       lowBalanceThresholdKobo: kobo.min(0),
+      copay,
+      authorizationThresholdKobo: kobo.min(0),
     }).partial().refine((b) => Object.keys(b).length > 0, 'Nothing to update'),
   }),
   asyncHandler(async (req, res) => res.json(await payers.updatePayer(req.params.id, req.body, reqContext(req))))

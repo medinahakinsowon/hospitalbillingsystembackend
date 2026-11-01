@@ -12,6 +12,7 @@ const coverageSchema = new Schema(
       default: null,
       validate: { validator: (v) => v === null || Number.isSafeInteger(v), message: 'must be an integer number of kobo' },
     },
+    usageVersion: { type: Number, default: 0 }, // bumped when a limited member is charged, to serialise concurrent charges
     validFrom: { type: Date, required: true, default: Date.now },
     validTo: { type: Date, default: null },
     status: { type: String, enum: ['active', 'inactive', 'suspended'], default: 'active' },

@@ -34,6 +34,10 @@ const schema = z.object({
   // Family cards: default maximum number of people (holder included) on one card
   FAMILY_CARD_MAX_MEMBERS: z.coerce.number().int().min(2).max(50).default(10),
 
+  // Maker-checker: the person who requests an adjustment, refund or authorization may not approve it.
+  // Set to 'true' ONLY on a single-user development machine.
+  ALLOW_SELF_APPROVAL: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+
   // Protects the scheduled reconciliation endpoint (Vercel Cron sends it as a Bearer token)
   CRON_SECRET: optional(z.string().min(16)),
 });
