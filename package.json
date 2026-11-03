@@ -15,7 +15,8 @@
     "seed:catalog": "node scripts/seed-catalog.js",
     "test:billing": "node scripts/billing-smoke-test.js",
     "test:cards": "node scripts/cards-smoke-test.js",
-    "test:controls": "node scripts/controls-smoke-test.js"
+    "test:controls": "node scripts/controls-smoke-test.js",
+    "test:ops": "node scripts/ops-smoke-test.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

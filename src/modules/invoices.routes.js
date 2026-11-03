@@ -14,6 +14,7 @@ router.get('/',
   validate({ query: pagination.extend({
     payerId: objectId.optional(), patientId: objectId.optional(), encounterId: objectId.optional(),
     status: z.enum(['issued', 'partial', 'paid', 'void']).optional(),
+    overdue: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
   }) }),
   asyncHandler(async (req, res) => res.json(await listInvoices(req.query))));
 

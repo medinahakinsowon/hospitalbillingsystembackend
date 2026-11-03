@@ -78,7 +78,7 @@ export async function getPayer(id) {
   return toPayerView(payer);
 }
 
-const UPDATABLE = ['name', 'status', 'billingContact', 'creditLimitKobo', 'paymentTermsDays', 'billingCycle', 'guarantor', 'contract', 'tariffId', 'maxMembers', 'lowBalanceThresholdKobo', 'copay', 'authorizationThresholdKobo'];
+const UPDATABLE = ['name', 'status', 'billingContact', 'creditLimitKobo', 'paymentTermsDays', 'billingCycle', 'guarantor', 'contract', 'tariffId', 'maxMembers', 'lowBalanceThresholdKobo', 'copay', 'authorizationThresholdKobo', 'notifyOptOut'];
 
 export async function updatePayer(id, patch, ctx) {
   const payer = await Payer.findById(id);
@@ -94,6 +94,9 @@ export async function updatePayer(id, patch, ctx) {
   if (!Object.keys(diff.after).length) return toPayerView(before);
 
   payer.set(diff.after);
+  // Remember WHY a payer is suspended: the overdue job only ever lifts suspensions it caused itself.
+  if (diff.after.status === 'suspended') { payer.suspendedReason = 'manual'; payer.suspendedAt = new Date(); }
+  if (diff.after.status === 'active') { payer.suspendedReason = undefined; payer.suspendedAt = undefined; }
   await payer.save();
   await recordAudit(ctx, { action: 'payer.update', entity: 'Payer', entityId: payer._id, ...diff });
   return toPayerView(payer.toObject());

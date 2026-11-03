@@ -34,6 +34,7 @@ const paymentSchema = new Schema(
       fees: Number,
       note: String,
     },
+    cashierSessionId: { type: Schema.Types.ObjectId, ref: 'CashierSession' }, // the till shift that took this payment
     ledgerEntryId: { type: Schema.Types.ObjectId, ref: 'LedgerEntry' },
     idempotencyKey: String,
     receivedBy: { type: Schema.Types.ObjectId, ref: 'User' },
@@ -47,5 +48,7 @@ paymentSchema.index({ idempotencyKey: 1 }, { unique: true, partialFilterExpressi
 paymentSchema.index({ payerId: 1, status: 1, createdAt: -1 });
 paymentSchema.index({ payerId: 1, status: 1, unallocatedKobo: 1 });
 paymentSchema.index({ status: 1, method: 1, createdAt: 1 });
+paymentSchema.index({ cashierSessionId: 1, status: 1 });
+paymentSchema.index({ status: 1, completedAt: -1 });
 
 export const Payment = mongoose.model('Payment', paymentSchema);

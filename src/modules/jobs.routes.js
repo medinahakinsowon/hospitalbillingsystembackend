@@ -5,6 +5,9 @@ import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { reconcilePendingPayments } from '../services/payments.service.js';
 import { generateDueInvoices } from '../services/billing-cycle.service.js';
+import { processOverdue, queueLowBalanceAlerts } from '../services/overdue.service.js';
+import { dispatchNotifications } from '../services/notifications.service.js';
+import { runDailyJobs } from '../services/jobs.service.js';
 
 const router = Router();
 
@@ -19,6 +22,10 @@ function requireCronSecret(req, res, next) {
   next();
 }
 
+// One call that does everything due today. This is what the Vercel cron calls.
+router.get('/daily', requireCronSecret, asyncHandler(async (req, res) => res.json(await runDailyJobs())));
+router.get('/process-overdue', requireCronSecret, asyncHandler(async (req, res) => res.json({ overdue: await processOverdue(), lowBalance: await queueLowBalanceAlerts() })));
+router.get('/send-notifications', requireCronSecret, asyncHandler(async (req, res) => res.json(await dispatchNotifications())));
 router.get('/generate-invoices', requireCronSecret, asyncHandler(async (req, res) => res.json(await generateDueInvoices())));
 router.get('/reconcile-payments', requireCronSecret, asyncHandler(async (req, res) => res.json(await reconcilePendingPayments())));
 

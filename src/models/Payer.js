@@ -50,6 +50,10 @@ const payerSchema = new Schema(
       coveredServices: [String],
       excludedServices: [String],
     },
+    // Why a payer is suspended: 'overdue' is lifted automatically when the debt is cleared; 'manual' only by a person.
+    suspendedReason: { type: String, enum: ['overdue', 'manual'] },
+    suspendedAt: Date,
+    notifyOptOut: { type: Boolean, default: false }, // do not send this payer SMS/email
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }

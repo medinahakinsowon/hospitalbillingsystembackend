@@ -17,6 +17,7 @@ const patientSchema = new Schema(
     searchName: { type: String }, // lowercase "last first other" for search and duplicate checks
     selfPayerId: { type: Schema.Types.ObjectId, ref: 'Payer' },
     status: { type: String, enum: ['active', 'inactive', 'deceased'], default: 'active' },
+    notifyOptOut: { type: Boolean, default: false }, // patient asked not to receive SMS/email
     deletedAt: { type: Date, default: null }, // soft delete only
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },

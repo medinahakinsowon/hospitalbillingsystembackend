@@ -9,6 +9,7 @@ import { AppError } from '../utils/AppError.js';
 import { nextSequence, pad } from '../utils/counters.js';
 import { applyCreditToInvoice } from './invoices.service.js';
 import { recordAudit } from './audit.service.js';
+import { enqueueNotifications } from './notifications.service.js';
 
 const HOUR = 3600e3;
 const MAX_LINES = 10_000; // lines are embedded in the invoice document; keep it far below MongoDB's 16 MB limit
@@ -109,6 +110,12 @@ export async function invoicePayerPeriod(payerId, { periodStart, periodEnd, clai
     if (upd.modifiedCount !== charges.length) throw new AppError(409, 'CHARGES_CHANGED', 'Charges changed while invoicing. Please retry.');
 
     await applyCreditToInvoice(invoice._id, session);
+    if (totalKobo > 0) {
+      await enqueueNotifications({
+        template: 'invoice_issued', payer, data: { payerName: payer.name, invoiceNo, totalKobo, dueAt: invoice.dueAt },
+        dedupeKey: `invoice:${invoice._id}`, relatedType: 'invoice', relatedId: invoice._id,
+      }, session);
+    }
     await recordAudit(ctx, {
       action: 'invoice.issue', entity: 'Invoice', entityId: invoice._id,
       after: { invoiceNo, type: invoice.type, payerId: payer._id, totalKobo, lines: lines.length, people: patientIds.length, periodEnd: end },

@@ -15,6 +15,9 @@ const ALL = [
   'authorizations:read', 'authorizations:request', 'authorizations:decide',
   'adjustments:read', 'adjustments:request', 'adjustments:approve',
   'refunds:read', 'refunds:request', 'refunds:approve', 'refunds:pay',
+  'sessions:manage', 'sessions:review',
+  'reports:read',
+  'notifications:read', 'notifications:manage',
 ];
 
 const clinical = ['patients:read', 'coverages:read', 'services:read', 'encounters:read', 'charges:create', 'charges:read'];
@@ -31,6 +34,7 @@ export const ROLE_PERMISSIONS = {
     'services:read', 'tariffs:read', 'encounters:read', 'encounters:update', 'charges:read',
     'invoices:read', 'invoices:create', 'payments:create', 'payments:read', 'payments:verify',
     'adjustments:read', 'adjustments:request', 'refunds:read', 'refunds:request', 'refunds:pay', 'authorizations:read',
+    'sessions:manage',
   ],
   doctor: [...clinical, 'authorizations:read', 'authorizations:request'],
   pharmacist: clinical,
@@ -42,6 +46,7 @@ export const ROLE_PERMISSIONS = {
     'invoices:read', 'invoices:create', 'invoices:generate', 'payments:create', 'payments:read', 'payments:verify',
     'authorizations:read', 'authorizations:request', 'authorizations:decide',
     'adjustments:read', 'adjustments:request', 'refunds:read', 'refunds:request',
+    'sessions:manage', 'reports:read', 'notifications:read', 'notifications:manage',
   ],
   finance_manager: [
     'patients:read', 'payers:read', 'payers:update', 'coverages:read',
@@ -50,6 +55,7 @@ export const ROLE_PERMISSIONS = {
     'encounters:read', 'encounters:override', 'charges:read', 'charges:void', 'charges:override',
     'invoices:read', 'payments:read', 'payments:verify',
     'authorizations:read', 'authorizations:decide', 'adjustments:read', 'adjustments:approve', 'refunds:read', 'refunds:approve',
+    'sessions:review', 'reports:read', 'notifications:read',
   ],
 };
 

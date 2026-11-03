@@ -106,12 +106,13 @@ export async function invoiceEncounter(encounterId, { payerId, payerTypes } = {}
   });
 }
 
-export async function listInvoices({ payerId, patientId, encounterId, status, page, limit }) {
+export async function listInvoices({ payerId, patientId, encounterId, status, overdue, page, limit }) {
   const filter = {};
+  if (overdue) { filter.status = { $in: ['issued', 'partial'] }; filter.dueAt = { $lt: new Date() }; }
   if (payerId) filter.payerId = payerId;
   if (patientId) filter.patientId = patientId;
   if (encounterId) filter.encounterId = encounterId;
-  if (status) filter.status = status;
+  if (status) filter.status = overdue ? { $in: ['issued', 'partial'].filter((s) => s === status) } : status;
   const [items, total] = await Promise.all([
     Invoice.find(filter).select('-lines').sort({ issuedAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
     Invoice.countDocuments(filter),
@@ -119,7 +120,11 @@ export async function listInvoices({ payerId, patientId, encounterId, status, pa
   return { items: items.map(withBalance), page, limit, total };
 }
 
-export const withBalance = (inv) => ({ ...inv, balanceKobo: inv.totalKobo - inv.paidKobo });
+export const withBalance = (inv) => {
+  const balanceKobo = inv.totalKobo - inv.paidKobo;
+  const overdue = ['issued', 'partial'].includes(inv.status) && balanceKobo > 0 && Boolean(inv.dueAt) && inv.dueAt < new Date();
+  return { ...inv, balanceKobo, overdue, daysOverdue: overdue ? Math.floor((Date.now() - inv.dueAt) / 86400000) : 0 };
+};
 
 export async function getInvoice(id) {
   const inv = await Invoice.findById(id).lean();

@@ -108,6 +108,7 @@ router.patch(
       lowBalanceThresholdKobo: kobo.min(0),
       copay,
       authorizationThresholdKobo: kobo.min(0),
+      notifyOptOut: z.boolean(),
     }).partial().refine((b) => Object.keys(b).length > 0, 'Nothing to update'),
   }),
   asyncHandler(async (req, res) => res.json(await payers.updatePayer(req.params.id, req.body, reqContext(req))))

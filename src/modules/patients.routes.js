@@ -58,6 +58,7 @@ router.patch(
     body: base.omit({ sex: true }).partial().extend({
       sex: z.enum(['male', 'female']).optional(),
       status: z.enum(['active', 'inactive', 'deceased']).optional(),
+      notifyOptOut: z.boolean().optional(), // patient asked not to receive SMS/email
     }).refine((b) => Object.keys(b).length > 0, 'Nothing to update'),
   }),
   asyncHandler(async (req, res) => res.json(await patients.updatePatient(req.params.id, req.body, reqContext(req))))

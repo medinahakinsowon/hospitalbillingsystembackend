@@ -10,6 +10,7 @@ import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { idParam, pagination, password } from '../utils/schemas.js';
 import { recordAudit, reqContext } from '../services/audit.service.js';
+import { adminResetMfa } from '../services/mfa.service.js';
 
 const router = Router();
 router.use(authenticate(), requirePermission('users:manage'));
@@ -87,5 +88,9 @@ router.patch(
     res.json(user.toJSON());
   })
 );
+
+// Lost phone? Clear their two-factor setup; they enrol again at next sign-in.
+router.post('/:id/mfa-reset', validate({ params: idParam }),
+  asyncHandler(async (req, res) => { await adminResetMfa(req.params.id, reqContext(req)); res.json({ reset: true }); }));
 
 export default router;

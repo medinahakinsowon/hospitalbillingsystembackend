@@ -12,6 +12,8 @@ import { nextSequence, pad } from '../utils/counters.js';
 import { bumpInvoicePaid } from './invoices.service.js';
 import { postLedgerEntry } from './ledger.service.js';
 import { recordAudit } from './audit.service.js';
+import { requireOpenSession, touchSession } from './cashier-sessions.service.js';
+import { enqueueNotifications } from './notifications.service.js';
 import * as paystack from './paystack.service.js';
 
 const SYSTEM_CTX = { actorId: null, actorRole: 'system', ip: null, userAgent: 'paystack' };
@@ -82,6 +84,11 @@ async function completePayment(payment, extra, ctx, session) {
     { returnDocument: 'after', session }
   );
   if (!done) throw new AppError(409, 'PAYMENT_CHANGED', 'Payment changed while completing. Please retry.');
+  const payer = await Payer.findById(payment.payerId).session(session).lean();
+  await enqueueNotifications({
+    template: 'payment_received', payer, data: { payerName: payer.name, receiptNo, amountKobo: payment.amountKobo, method: payment.method },
+    dedupeKey: `payment:${payment._id}`, relatedType: 'payment', relatedId: payment._id,
+  }, session);
   return done;
 }
 
@@ -97,11 +104,13 @@ export async function recordManualPayment(input, ctx) {
       return { payment: existing, duplicate: true };
     }
   }
+  const till = await requireOpenSession(ctx); // after the replay check above: a retry must still succeed once the shift has closed
   const { patientId } = await resolveTarget({ payerId, amountKobo, invoiceId, encounterId });
 
   const payment = await withTransaction(async (session) => {
+    if (till) await touchSession(till._id, session);
     const [created] = await Payment.create([{
-      payerId, patientId, invoiceId, encounterId, method, amountKobo, externalRef, idempotencyKey, autoAllocate,
+      payerId, patientId, invoiceId, encounterId, method, amountKobo, externalRef, idempotencyKey, autoAllocate, cashierSessionId: till?._id,
       status: 'pending', unallocatedKobo: 0, receivedBy: ctx.actorId,
     }], { session });
     const done = await completePayment(created, {}, ctx, session);
@@ -225,7 +234,7 @@ export async function handlePaystackWebhook(rawBody) {
     const verified = await paystack.verifyTransaction(reference);
     const result = await finalizePaystackPayment(reference, verified.data);
     await PaystackEvent.updateOne({ _id: log._id }, { $set: { status: result.outcome === 'amount_mismatch' ? 'failed' : 'processed', outcome: result.outcome, processedAt: new Date() } });
-    return { handled: true, reason: result.outcome };
+    return { handled: true, reason: result.outcome, paymentId: result.payment?._id };
   } catch (err) {
     await PaystackEvent.updateOne({ _id: log._id }, { $set: { status: 'failed', error: `${err.code || err.name}: ${err.message}`.slice(0, 300) } });
     throw err; // non-2xx makes Paystack retry later

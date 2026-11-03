@@ -88,7 +88,7 @@ export async function getPatient(id, ctx) {
   return patient;
 }
 
-const UPDATABLE = ['firstName', 'lastName', 'otherNames', 'dob', 'sex', 'phone', 'email', 'address', 'nextOfKin', 'status'];
+const UPDATABLE = ['firstName', 'lastName', 'otherNames', 'dob', 'sex', 'phone', 'email', 'address', 'nextOfKin', 'status', 'notifyOptOut'];
 
 export async function updatePatient(id, patch, ctx) {
   const patient = await Patient.findOne({ _id: id, deletedAt: null });

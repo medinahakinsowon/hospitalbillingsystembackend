@@ -4,6 +4,7 @@ import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { verifySignature } from '../services/paystack.service.js';
 import { handlePaystackWebhook } from '../services/payments.service.js';
+import { dispatchRelatedBestEffort } from '../services/notifications.service.js';
 
 const router = Router();
 
@@ -15,6 +16,7 @@ router.post('/paystack', asyncHandler(async (req, res) => {
   }
   await connectDB();
   const result = await handlePaystackWebhook(req.rawBody);
+  if (result.reason === 'success' && result.paymentId) await dispatchRelatedBestEffort('payment', result.paymentId);
   res.status(200).json({ received: true, ...result }); // any 2xx tells Paystack to stop retrying
 }));
 

@@ -8,6 +8,7 @@ import { idempotencyKeyOf } from '../utils/idempotency.js';
 import { reqContext } from '../services/audit.service.js';
 import * as payments from '../services/payments.service.js';
 import { streamReceiptPdf } from '../services/pdf.service.js';
+import { dispatchRelatedBestEffort } from '../services/notifications.service.js';
 
 const router = Router();
 router.use(authenticate());
@@ -30,6 +31,7 @@ router.post('/', requirePermission('payments:create'),
   }).refine(oneTarget, oneTargetMsg) }),
   asyncHandler(async (req, res) => {
     const { payment, duplicate } = await payments.recordManualPayment({ ...req.body, idempotencyKey: idempotencyKeyOf(req) }, reqContext(req));
+    if (!duplicate) await dispatchRelatedBestEffort('payment', payment._id);
     res.status(duplicate ? 200 : 201).json({ ...payment, duplicate });
   }));
 
@@ -51,7 +53,11 @@ router.get('/:id', requirePermission('payments:read'), validate({ params: idPara
 
 // Ask Paystack about this payment now (use when the customer returns from checkout)
 router.post('/:id/verify', requirePermission('payments:verify'), validate({ params: idParam }),
-  asyncHandler(async (req, res) => res.json(await payments.verifyPaymentById(req.params.id))));
+  asyncHandler(async (req, res) => {
+    const result = await payments.verifyPaymentById(req.params.id);
+    if (result.outcome === 'success') await dispatchRelatedBestEffort('payment', result.payment._id);
+    res.json(result);
+  }));
 
 // Apply credit already sitting on a successful payment (deposit, lump sum, overpayment) to open invoices
 router.post('/:id/allocate', requirePermission('payments:create'),

@@ -19,6 +19,7 @@ const refundSchema = new Schema(
     paidBy: { type: Schema.Types.ObjectId, ref: 'User' },
     paidAt: Date,
     payoutRef: { type: String, maxlength: 80 },
+    paidSessionId: { type: Schema.Types.ObjectId, ref: 'CashierSession' }, // the till shift that handed the money out
     ledgerEntryId: { type: Schema.Types.ObjectId, ref: 'LedgerEntry' },
   },
   { timestamps: true }

@@ -45,6 +45,8 @@ const invoiceSchema = new Schema(
     paidKobo: { ...kobo, default: 0 },
     creditedKobo: { ...kobo, default: 0 },
 
+    remindersSent: [Number], // overdue reminder stages (days) already sent
+    lastReminderAt: Date,
     periodStart: Date, // consolidated invoices and statements
     periodEnd: Date,
     issuedAt: { type: Date, default: Date.now },

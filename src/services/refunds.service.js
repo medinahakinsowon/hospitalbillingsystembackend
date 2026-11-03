@@ -7,6 +7,7 @@ import { nextSequence, pad } from '../utils/counters.js';
 import { assertDifferentPerson } from '../utils/makerChecker.js';
 import { postLedgerEntry, reverseLedgerEntryInTx } from './ledger.service.js';
 import { recordAudit } from './audit.service.js';
+import { requireOpenSession, touchSession } from './cashier-sessions.service.js';
 
 /** Ask to return money from credit a payer holds on a payment (unused deposit, overpayment, credit released by a credit note). */
 export async function requestRefund({ paymentId, amountKobo, method, reason }, ctx) {
@@ -64,20 +65,24 @@ export async function decideRefund(id, { decision, note }, ctx) {
   });
 }
 
-/** The cashier hands over the money and records how. */
+/** The cashier hands over the money and records how. The payout belongs to their open shift, so the till reconciles. */
 export async function payRefund(id, { payoutRef }, ctx) {
-  const refund = await Refund.findOneAndUpdate(
-    { _id: id, status: 'approved' },
-    { $set: { status: 'paid', paidBy: ctx.actorId, paidAt: new Date(), payoutRef } },
-    { returnDocument: 'after' }
-  );
-  if (!refund) {
-    const existing = await Refund.findById(id).select('status').lean();
-    if (!existing) throw new AppError(404, 'REFUND_NOT_FOUND', 'Refund not found');
-    throw new AppError(422, 'NOT_PAYABLE', `Only approved refunds can be paid out (this one is ${existing.status})`);
-  }
-  await recordAudit(ctx, { action: 'refund.pay', entity: 'Refund', entityId: refund._id, meta: { payoutRef, amountKobo: refund.amountKobo, method: refund.method } });
-  return refund.toObject();
+  const till = await requireOpenSession(ctx);
+  return withTransaction(async (session) => {
+    if (till) await touchSession(till._id, session);
+    const refund = await Refund.findOneAndUpdate(
+      { _id: id, status: 'approved' },
+      { $set: { status: 'paid', paidBy: ctx.actorId, paidAt: new Date(), payoutRef, paidSessionId: till?._id } },
+      { returnDocument: 'after', session }
+    );
+    if (!refund) {
+      const existing = await Refund.findById(id).select('status').session(session).lean();
+      if (!existing) throw new AppError(404, 'REFUND_NOT_FOUND', 'Refund not found');
+      throw new AppError(422, 'NOT_PAYABLE', `Only approved refunds can be paid out (this one is ${existing.status})`);
+    }
+    await recordAudit(ctx, { action: 'refund.pay', entity: 'Refund', entityId: refund._id, meta: { payoutRef, amountKobo: refund.amountKobo, method: refund.method } }, session);
+    return refund.toObject();
+  });
 }
 
 /** Cancel before money is handed over. If it was already approved, the credit is put back exactly as it was. */

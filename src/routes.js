@@ -16,6 +16,9 @@ import jobs from './modules/jobs.routes.js';
 import authorizations from './modules/authorizations.routes.js';
 import adjustments from './modules/adjustments.routes.js';
 import refunds from './modules/refunds.routes.js';
+import cashierSessions from './modules/cashier-sessions.routes.js';
+import reports from './modules/reports.routes.js';
+import notificationsRoutes from './modules/notifications.routes.js';
 
 const router = Router();
 router.use('/auth', auth);
@@ -35,4 +38,7 @@ router.use('/jobs', jobs);
 router.use('/authorizations', authorizations);
 router.use('/adjustments', adjustments);
 router.use('/refunds', refunds);
+router.use('/cashier-sessions', cashierSessions);
+router.use('/reports', reports);
+router.use('/notifications', notificationsRoutes);
 export default router;
